@@ -22,7 +22,7 @@ nothing is fabricated.
 
 ---
 
-## ✨ Features
+## Features
 
 - **Autonomous agent harness** (`convex/runAgent.ts`) — a simplified Hermes-style
   loop that:
@@ -45,7 +45,7 @@ nothing is fabricated.
   and never trusted from the client.
 - **Telemetry with retention** — 14-day sweep keeps the log bounded.
 
-## 🧱 Stack
+## Stack
 
 | Layer | Tech |
 |---|---|
@@ -54,7 +54,7 @@ nothing is fabricated.
 | Chain | Solana — Jupiter (pricing), public RPC + Helius (wallet/launch data) |
 | Auth | Convex Auth (sign-in) |
 
-## 🏃 Getting Started
+## Getting Started
 
 ```
 npm install
@@ -70,19 +70,19 @@ npm run dev             # vite frontend
 > `convex dev` on any unblocked machine). Unblock the binary, or deploy to Convex
 > Cloud, to run the live app.
 
-## ✔️ Checks
+## Checks
 
 ```
 npm run typecheck   # tsc --noEmit
 npm run lint        # eslint src convex
 ```
 
-## 🔗 Live app & demo
+## Live app & demo
 
 - **Live URL:** _will fill in after deploy_
 - **Demo video:** _will fill in after deploy_
 
-## 🌐 Production / roadmap
+## Production / roadmap
 
 - [ ] Deploy to Convex Cloud + Vercel and drop in the live URL above.
 - [ ] Capture a demo clip and link it above.
