@@ -1,8 +1,6 @@
 # Alpha Scout
 
-
-
-[![build](https://img.shields.io/badge/build-passing-brightgreen)](#) [![typescript](https://img.shields.io/badge/TypeScript-5-blue)](#) [![convex](https://img.shields.io/badge/Convex-1.45-f56513)](#)
+[![build](https://img.shields.io/badge/build-passing-brightgreen)](#) [![typescript](https://img.shields.io/badge/TypeScript-5-blue)](#) [![convex](https://img.shields.io/badge/Convex-1.45-f56513)](#) [![solana](https://img.shields.io/badge/Solana-000000)](#)
 
 Real-data autonomous trading agent for Solana pump launches. The agent **finds
 alpha before it moves — verifiably, onchain.** No mocked or seeded numbers: every
