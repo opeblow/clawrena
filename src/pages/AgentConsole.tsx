@@ -28,6 +28,7 @@ export default function AgentConsole() {
   const user = data?.user;
   const agent = data?.agent;
   const portfolio = data?.portfolio;
+  const agentRuns = data?.agentRuns ?? [];
 
   const handleDeposit = async (event: FormEvent) => {
     event.preventDefault();
@@ -250,6 +251,47 @@ const PaperModePill = () => (
 
           {agent && (
             <>
+              <Card
+                title="Harness Audit Log"
+                badge={<CardBadge>{agentRuns.length} runs</CardBadge>}
+                bodyClassName="p-2"
+              >
+                {agentRuns.length === 0 ? (
+                  <div className="px-4 py-4 text-[13px] text-ink-mid">
+                    No cycles recorded yet. Every harness run lands here with its
+                    real outcome and counts — nothing is simulated.
+                  </div>
+                ) : (
+                  <div className="flex flex-col">
+                    {agentRuns.slice(0, 6).map((r) => (
+                      <div
+                        key={r._id}
+                        className="flex items-center gap-3 px-4 py-2.5 text-[13px] border-b border-line last:border-0"
+                      >
+                        <span
+                          className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                            r.outcome === "ok"
+                              ? "bg-up"
+                              : r.outcome === "halted"
+                                ? "bg-accent"
+                                : "bg-down"
+                          }`}
+                        />
+                        <span className="font-mono w-24 text-ink-faint">
+                          {new Date(r.startedAt).toLocaleTimeString()}
+                        </span>
+                        <span className="font-semibold text-ink uppercase text-[11px] w-16">
+                          {r.outcome}
+                        </span>
+                        <span className="text-ink-mid">
+                          {r.scansProcessed} scanned · {r.tradesExecuted} traded
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Card>
+
               <Card
                 title="Risk Controls"
                 bodyClassName="p-5 flex flex-col gap-3"

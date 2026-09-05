@@ -14,10 +14,12 @@ crons.interval(
 
 // Launch-discovery scanner. Polls pump.fun's recent signatures, parses them
 // into real mint addresses and ingests `new-launch` signals (deduped by mint).
-// No-ops cleanly when Helius is not configured.
+// Runs hourly in demo mode so the data used by the demo video stays
+// deterministic within a recording window; restore to { minutes: 10 } for
+// production. No-ops cleanly when every RPC is unreachable.
 crons.interval(
   "launch-scanner",
-  { minutes: 10 },
+  { minutes: 60 },
   internal.scanner.discover,
   {},
 );

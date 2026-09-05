@@ -46,6 +46,27 @@ export const dashboard = query({
       .withIndex("by_ownerId", (q) => q.eq("ownerId", user._id))
       .first();
 
+    // Recent trades for this portfolio (sell + buy), newest first — the
+    // auditable execution record. Real rows only; empty until something trades.
+    let trades: any[] = [];
+    if (portfolio) {
+      trades = await ctx.db
+        .query("trades")
+        .withIndex("by_portfolioId_timestamp", (q) => q.eq("portfolioId", portfolio._id))
+        .order("desc")
+        .take(20);
+    }
+
+    // Recent harness cycles for the user's agent (agent_runs audit log).
+    let agentRuns: any[] = [];
+    if (agent) {
+      agentRuns = await ctx.db
+        .query("agent_runs")
+        .withIndex("by_agentId_startedAt", (q) => q.eq("agentId", agent._id))
+        .order("desc")
+        .take(8);
+    }
+
     // Aggregate real numbers only. Position value is mark-to-market — current
     // price ratio applied to the SOL size — not entry cost basis.
     const positionValue = positions.reduce(
@@ -91,6 +112,8 @@ export const dashboard = query({
           }
         : null,
       positions,
+      trades,
+      agentRuns,
       signals,
     };
   },

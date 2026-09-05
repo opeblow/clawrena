@@ -204,13 +204,14 @@ export async function fetchHolderConcentration(mint: string): Promise<HolderConc
 }
 
 /**
- * Real recent-launch discovery. Requires a Helius RPC because it lists recent
- * signatures for the pump.fun program. With no Helius key this returns [] —
- * the scanner never fabricates candidate tokens.
+ * Real recent-launch discovery. Lists recent signatures for the pump.fun
+ * program. Prefers Helius for rate limits; when no Helius key is configured
+ * it falls back through the plain public RPCs in the shared failover list
+ * (these rate-limit hard, so callers pass a small limit and pace calls).
+ * With every RPC unreachable this returns [] — the scanner never fabricates
+ * candidate tokens.
  */
 export async function fetchRecentLaunches(limit = 25): Promise<string[]> {
-  const cfg = marketConfig();
-  if (!cfg.heliusConfigured || !cfg.heliusRpcUrl) return [];
   try {
     const res = await rpcCall("getSignaturesForAddress", [
       PUMP_FUN_PROGRAM,
@@ -237,13 +238,17 @@ export type LaunchEvent = { mint: string; signature: string; ts: number };
  * Returns [] when Helius is not configured or nothing resolvable was found.
  */
 export async function fetchLaunchMints(limit = 25): Promise<LaunchEvent[]> {
-  const cfg = marketConfig();
-  if (!cfg.heliusConfigured || !cfg.heliusRpcUrl) return [];
   const signatures = await fetchRecentLaunches(limit);
   const events: LaunchEvent[] = [];
   for (const signature of signatures.slice(0, 15)) {
     const mint = await findMintCreatedInTx(signature);
-    if (mint) events.push({ mint, signature, ts: Date.now() });
+    if (mint) {
+      events.push({
+        mint: mint.mint,
+        signature,
+        ts: mint.blockTime ?? Date.now(),
+      });
+    }
   }
   return events;
 }
@@ -254,7 +259,9 @@ export async function fetchLaunchMints(limit = 25): Promise<LaunchEvent[]> {
  * for a token balance delta where a new account appears in postTokenBalances
  * with no pre-table entry. Returns null when nothing is resolvable.
  */
-export async function findMintCreatedInTx(signature: string): Promise<string | null> {
+export async function findMintCreatedInTx(
+  signature: string,
+): Promise<{ mint: string; blockTime?: number } | null> {
   try {
     const res = await rpcCall("getTransaction", [
       signature,
@@ -285,7 +292,7 @@ export async function findMintCreatedInTx(signature: string): Promise<string | n
       if (b.mint && !preMints.has(b.mint)) created.add(b.mint);
     }
     if (created.size === 0) return null;
-    return [...created][0];
+    return { mint: [...created][0], blockTime: tx.blockTime ? tx.blockTime * 1000 : undefined };
   } catch {
     return null;
   }

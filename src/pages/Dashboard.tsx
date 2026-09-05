@@ -17,6 +17,7 @@ export default function Dashboard() {
   const portfolio = data.portfolio;
   const agent = data.agent;
   const positions = data.positions;
+  const trades = data.trades ?? [];
   const signals = data.signals;
 
   return (
@@ -88,6 +89,28 @@ export default function Dashboard() {
                     <Pnl value={p.pnlPct} />
                   </div>
                 ))}
+                </div>
+              </div>
+            )}
+          </Card>
+
+          <Card
+            title="Recent Trades"
+            badge={<CardBadge>{trades.length} recorded</CardBadge>}
+          >
+            {trades.length === 0 ? (
+              <EmptyState
+                icon="⇄"
+                title="No trades yet"
+                hint="Buy and sell executions land here as real records — direction, size, price, PnL and time. Nothing is seeded."
+              />
+            ) : (
+              <div className="overflow-x-auto">
+                <div className="min-w-[640px]">
+                  <TradeRowHeader />
+                  {trades.slice(0, 6).map((t) => (
+                    <TradeRow key={t._id} t={t} />
+                  ))}
                 </div>
               </div>
             )}
@@ -197,6 +220,65 @@ function PaperModeNotice() {
     <span className="rounded-md bg-[#FFF4E0] border border-accent/40 text-accent text-[10px] font-bold px-2 py-1 tracking-wide">
       PAPER MODE — simulated execution, no live swaps
     </span>
+  );
+}
+
+type Trade = {
+  _id: string;
+  direction: "buy" | "sell";
+  tokenMint: string;
+  tokenSymbol?: string;
+  amountSol: number;
+  price: number;
+  pnlSol?: number;
+  pnlPct?: number;
+  txSignature?: string;
+  executedBy: "user" | "agent";
+  timestamp: number;
+};
+
+function TradeRowHeader() {
+  return (
+    <div className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr] gap-3 items-center px-5 py-2.5 border-b border-line bg-surface text-[11px] font-semibold text-ink-faint uppercase tracking-wide">
+      <span>Side · Token</span>
+      <span>Price</span>
+      <span>Size</span>
+      <span>PnL</span>
+      <span>Time</span>
+    </div>
+  );
+}
+
+function TradeRow({ t }: { t: Trade }) {
+  const isBuy = t.direction === "buy";
+  return (
+    <div className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr] gap-3 items-center px-5 py-3.5 border-b border-line last:border-0">
+      <div className="flex items-center gap-2.5 min-w-0">
+        <span
+          className={`w-8 h-8 rounded-lg flex items-center justify-center text-[12px] flex-shrink-0 ${
+            isBuy ? "bg-up-bg text-up" : "bg-down-bg text-down"
+          }`}
+        >
+          {isBuy ? "▲" : "▼"}
+        </span>
+        <div className="min-w-0">
+          <div className="font-semibold text-sm flex items-center gap-2">
+            {isBuy ? "BUY" : "SELL"} {t.tokenSymbol ?? "Unknown"}
+            {!t.txSignature && <PaperPill />}
+          </div>
+          <div className="text-[11px] text-ink-faint font-mono truncate">
+            {shorten(t.tokenMint)}
+            {t.executedBy === "agent" && <span className="text-accent"> · agent</span>}
+          </div>
+        </div>
+      </div>
+      <span className="font-mono text-[13px]">{formatPrice(t.price)}</span>
+      <span className="font-mono text-[13px]">{formatSol(t.amountSol)}</span>
+      <span className="font-mono text-[13px]">
+        {t.pnlSol !== undefined ? <Pnl value={t.pnlPct ?? (t.pnlSol >= 0 ? 1 : -1)} /> : "—"}
+      </span>
+      <span className="text-[12px] text-ink-faint">{timeAgo(t.timestamp)}</span>
+    </div>
   );
 }
 
