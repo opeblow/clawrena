@@ -1,10 +1,10 @@
 "use node";
 
-import { internalAction } from "./_generated/server";
+import { action, internalAction } from "./_generated/server";
 import type { ActionCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
-import { fetchPrices } from "./lib/market";
+import { fetchPrices, fetchMarketSnapshot, fetchHolderConcentration } from "./lib/market";
 
 // The typed `internal` aggregate is used throughout (runQuery/runMutation) so
 // internal calls are type-checked — no `internal as any`.
@@ -14,6 +14,13 @@ import { fetchPrices } from "./lib/market";
 const DEFAULT_STOP_PCT = 0.2;
 const DEFAULT_TAKE_PROFIT_PCT = 0.5;
 const MAX_DISCOVERIES_PER_CYCLE = 3;
+// Shield gate thresholds the harness applies before it can act on a signal:
+// real liquidity must exceed this (USD) and the largest holder must hold less
+// than this share. Anything unverifiable is treated as "not flagged" — the
+// agent only rejects on proven facts.
+const MIN_LIQUIDITY_USD = 1000;
+const MAX_TOP_HOLDER_PCT = 50;
+const FRACTION_OF_CASH_PER_ENTRY = 0.1;
 
 type AgentState = {
   id: Id<"agents">;
@@ -65,6 +72,33 @@ export const run = internalAction({
       summaries.push(await runCycle(ctx, t.id));
     }
     return summaries;
+  },
+});
+
+/**
+ * Demo-facing "Run cycle now": run exactly one harness cycle for the
+ * signed-in user's agent immediately, instead of waiting for the 15-minute
+ * cron. Auth-gated; no-ops cleanly when the user has no agent.
+ */
+export const runNow = action({
+  args: {},
+  handler: async (
+    ctx,
+  ): Promise<{
+    agentId: Id<"agents"> | null;
+    outcome: string;
+    reason?: string;
+    positionsProcessed?: number;
+    tradesExecuted?: number;
+  }> => {
+    const agentId: Id<"agents"> | null = await ctx.runQuery(
+      internal.queries.internal.getMyAgentId,
+      {},
+    );
+    if (!agentId) {
+      return { agentId: null, outcome: "none", reason: "no agent" };
+    }
+    return runCycle(ctx, agentId);
   },
 });
 
@@ -201,9 +235,10 @@ async function runCycle(ctx: ActionCtx, agentId: Id<"agents">) {
 /**
  * Discovery phase: for an eligible running agent, act on up to
  * MAX_DISCOVERIES_PER_CYCLE recent `new-launch` signals the agent has not yet
- * acted on. Each token must have a real Jupiter price (never guessed), the
- * size is the agent's configured risk max capped by remaining cash, and the
- * signal is marked acted so the harness never opens the same launch twice.
+ * acted on. Every token must pass the same live checks the manipulation shield
+ * uses — real Jupiter liquidity above the floor and no whale-dominated top
+ * holder — before entry. Size is min(riskMaxPosition, 10% of cash). The signal
+ * is marked acted so the harness never opens the same launch twice.
  */
 async function discoverEntries(
   ctx: ActionCtx,
@@ -224,19 +259,45 @@ async function discoverEntries(
   }
 
   const mints = candidates.map((c) => c.mint);
-  const prices = await fetchPrices(mints);
+  // One batched Jupiter call gives price + liquidity for every candidate;
+  // holder concentration is one parallel RPC round-trip per mint (public RPC
+  // with failover). Unknown holder data is treated as "not flagged".
+  const snap = await fetchMarketSnapshot(mints);
+  const holdings = await Promise.all(
+    candidates.map((c) => fetchHolderConcentration(c.mint).catch(() => null)),
+  );
   let remainingCash = Math.max(0, await currentCash(ctx, agent));
 
   let opened = 0;
   let examined = 0;
-  for (const c of candidates) {
-    const price = prices[c.mint];
+  for (let i = 0; i < candidates.length; i++) {
+    const c = candidates[i];
+    const price = snap[c.mint]?.priceUsd;
     if (price === undefined || price <= 0) continue;
     examined += 1;
     if (opened >= MAX_DISCOVERIES_PER_CYCLE) break;
     if (remainingCash <= 0) break;
 
-    const sizeSol = Math.min(agent.riskMaxPosition, remainingCash);
+    const liquidityUsd = snap[c.mint]?.liquidityUsd;
+    const holder = holdings[i];
+    const holderPct = holder?.largestHolderPct;
+    let rejectReason: string | null = null;
+    if (liquidityUsd === undefined) {
+      rejectReason = "liquidity unknown";
+    } else if (liquidityUsd <= MIN_LIQUIDITY_USD) {
+      rejectReason = `liquidity $${Math.round(liquidityUsd)} < floor`;
+    } else if (holderPct !== undefined && holderPct >= MAX_TOP_HOLDER_PCT) {
+      rejectReason = `top holder ${holderPct.toFixed(1)}%`;
+    }
+    if (rejectReason) {
+      await ctx.runMutation(internal.signals.recordTelemetry, {
+        eventType: "agent.shieldReject",
+        payload: { mint: c.mint, reason: rejectReason, at: Date.now() },
+      });
+      continue;
+    }
+
+    const sizeSol = Math.min(agent.riskMaxPosition, remainingCash * FRACTION_OF_CASH_PER_ENTRY);
     const entry = price;
     try {
       await ctx.runMutation(internal.trades.internalOpenPosition, {

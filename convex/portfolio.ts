@@ -43,6 +43,11 @@ export const depositSol = mutation({
     amountSol: v.number(),
     txSignature: v.optional(v.string()),
   },
+  // TODO(production): wrap this in a real SOL transfer once live execution is
+  // wired (ClawPump / Hermes funded wallet). For the demo this authenticates
+  // the user and credits the managed portfolio directly, so nothing on-chain
+  // has to exist for the app to close the loop — and the PAPER badge makes
+  // that explicit in the UI.
   handler: async (ctx, { amountSol, txSignature }) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity || !identity.tokenIdentifier) {
@@ -57,8 +62,8 @@ export const depositSol = mutation({
     if (!user) {
       throw new Error("User not found; call ensureUser first");
     }
-    if (!Number.isFinite(amountSol) || amountSol <= 0) {
-      throw new Error("Deposit amount must be positive");
+    if (!Number.isFinite(amountSol) || amountSol <= 0 || amountSol > 100) {
+      throw new Error("Deposit amount must be between 0 and 100 SOL");
     }
     let portfolio = await ctx.db
       .query("portfolios")

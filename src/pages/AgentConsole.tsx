@@ -13,6 +13,8 @@ export default function AgentConsole() {
   const updateRisk = useMutation(api.agents.updateAgentRisk);
   const depositSol = useMutation(api.portfolio.depositSol);
   const importBalance = useAction(api.wallet.importWalletBalance);
+  const runNow = useAction(api.runAgent.runNow);
+  const [running, setRunning] = useState(false);
 
   const [wallet, setWalletInput] = useState("");
   const [name, setName] = useState("Alpha Scout");
@@ -75,6 +77,22 @@ export default function AgentConsole() {
     }
   };
 
+  const handleRunCycle = async () => {
+    if (!agent) return;
+    setMsg(null);
+    setRunning(true);
+    try {
+      const r = await runNow();
+      setMsg(
+        `Cycle complete — outcome ${r.outcome}, ${r.positionsProcessed ?? 0} positions processed, ${r.tradesExecuted ?? 0} trade(s).`,
+      );
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "Cycle failed.");
+    } finally {
+      setRunning(false);
+    }
+  };
+
   const handleRisk = async () => {
     if (!agent) return;
     try {
@@ -88,6 +106,13 @@ export default function AgentConsole() {
       setMsg(e instanceof Error ? e.message : "Update failed.");
     }
   };
+
+/** Honesty marker: execution is paper until live swaps are wired. */
+const PaperModePill = () => (
+  <span className="rounded bg-[#FFF4E0] border border-accent/40 text-accent text-[9px] font-bold px-1.5 py-0.5 tracking-wide">
+    PAPER
+  </span>
+);
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-[1200px] mx-auto w-full">
@@ -107,7 +132,12 @@ export default function AgentConsole() {
                 </div>
               </div>
             }
-            badge={<CardBadge>{agent ? agent.status : "not deployed"}</CardBadge>}
+            badge={
+              <div className="flex items-center gap-2">
+                <PaperModePill />
+                <CardBadge>{agent ? agent.status : "not deployed"}</CardBadge>
+              </div>
+            }
           >
             <div className="px-6 py-4 text-sm text-ink-mid leading-relaxed">
               {agent ? (
@@ -259,6 +289,13 @@ export default function AgentConsole() {
                   className="px-5 py-3 rounded-xl bg-accent text-white text-sm font-semibold"
                 >
                   {agent.status === "running" ? "Pause agent" : "Start agent"}
+                </button>
+                <button
+                  onClick={() => void handleRunCycle()}
+                  disabled={running}
+                  className="px-5 py-3 rounded-xl border border-line text-sm font-semibold hover:border-accent hover:text-accent disabled:opacity-60"
+                >
+                  {running ? "Running cycle…" : "Run cycle now"}
                 </button>
               </Card>
 

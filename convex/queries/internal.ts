@@ -55,6 +55,30 @@ export const listEligibleAgents = internalQuery({
 });
 
 /**
+ * The signed-in user's agent id, resolved through their token identifier.
+ * Used by the "Run cycle now" demo action (actions can't touch the db).
+ */
+export const getMyAgentId = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity || !identity.tokenIdentifier) return null;
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_tokenIdentifier", (q) =>
+        q.eq("tokenIdentifier", identity.tokenIdentifier!),
+      )
+      .first();
+    if (!user) return null;
+    const agent = await ctx.db
+      .query("agents")
+      .withIndex("by_ownerId", (q) => q.eq("ownerId", user._id))
+      .first();
+    return agent?._id ?? null;
+  },
+});
+
+/**
  * Candidate tokens an agent may still act on: real `new-launch` signals not
  * yet acted on, excluding mints the agent already holds open. Used by the
  * harness discovery phase to open fresh positions only once per launch.

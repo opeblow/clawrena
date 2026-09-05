@@ -21,18 +21,21 @@ export default function Dashboard() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 flex flex-col gap-5 max-w-[1400px] mx-auto w-full">
-      <div className="text-[13px] text-ink-faint">
-        <b className="text-ink text-[15px]">
-          {data.user?.name ? `Good ${greeting()}, ${data.user.name}` : "Welcome"}
-        </b>
-        {agent ? (
-          <span className="text-ink-mid">
-            {" "}
-            · Your agent is <b className="text-ink">{agent.status}</b>
-          </span>
-        ) : (
-          <span className="text-ink-mid"> · connect a wallet and deploy an agent to begin</span>
-        )}
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="text-[13px] text-ink-faint">
+          <b className="text-ink text-[15px]">
+            {data.user?.name ? `Good ${greeting()}, ${data.user.name}` : "Welcome"}
+          </b>
+          {agent ? (
+            <span className="text-ink-mid">
+              {" "}
+              · Your agent is <b className="text-ink">{agent.status}</b>
+            </span>
+          ) : (
+            <span className="text-ink-mid"> · connect a wallet and deploy an agent to begin</span>
+          )}
+        </div>
+        <PaperModeNotice />
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -72,7 +75,10 @@ export default function Dashboard() {
                     <div className="flex items-center gap-2.5">
                       <TokenAvatar symbol={p.tokenSymbol} seed={p.tokenMint} />
                       <div>
-                        <div className="font-semibold text-sm">{p.tokenSymbol ?? "Unknown"}</div>
+                        <div className="font-semibold text-sm flex items-center gap-2">
+                          {p.tokenSymbol ?? "Unknown"}
+                          <PaperPill />
+                        </div>
                         <div className="text-[12px] text-ink-faint font-mono">{shorten(p.tokenMint)}</div>
                       </div>
                     </div>
@@ -170,6 +176,28 @@ function SignalIcon({ type }: { type: "buy" | "sell" | "warn" | "new-launch" | "
   if (type === "sell") return <span className="w-9 h-9 rounded-lg bg-down-bg text-down flex items-center justify-center">▼</span>;
   if (type === "new-launch") return <span className="w-9 h-9 rounded-lg bg-accent-light text-accent flex items-center justify-center">✦</span>;
   return <span className="w-9 h-9 rounded-lg bg-accent-light text-accent flex items-center justify-center">⚠</span>;
+}
+
+/**
+ * PAPER badge — clearly marks simulated execution. Positions created in the
+ * demo have no real txSignature (no live swap is wired yet); once execution
+ * records an on-chain txSignature, callers should stop rendering this pill.
+ */
+function PaperPill() {
+  return (
+    <span className="inline-block rounded bg-[#FFF4E0] border border-accent/40 text-accent text-[9px] font-bold px-1.5 py-0.5 tracking-wide">
+      PAPER
+    </span>
+  );
+}
+
+/** Small honesty banner: execution is paper until a live swap is wired. */
+function PaperModeNotice() {
+  return (
+    <span className="rounded-md bg-[#FFF4E0] border border-accent/40 text-accent text-[10px] font-bold px-2 py-1 tracking-wide">
+      PAPER MODE — simulated execution, no live swaps
+    </span>
+  );
 }
 
 function PositionsHeader() {
