@@ -1,6 +1,6 @@
-# Alpha Scout
+# Alpha Scout&nbsp;<img src="public/alpha-scout.svg" width="42" height="42" alt="Alpha Scout logo" align="left" style="margin-right:12px; transform:translateY(4px);">
 
-[![build](https://img.shields.io/badge/build-passing-brightgreen)](#) [![typescript](https://img.shields.io/badge/TypeScript-5-blue)](#) [![convex](https://img.shields.io/badge/Convex-1.45-f56513)](#) [![solana](https://img.shields.io/badge/Solana-000000)](#)
+[![build](https://img.shields.io/badge/build-passing-brightgreen)](#) [![typescript](https://img.shields.io/badge/TypeScript-5-blue)](#) [![convex](https://img.shields.io/badge/Convex-1.45-f56513)](#) [![solana](https://img.shields.io/badge/Solana-000000)](#) [![license](https://img.shields.io/badge/license-MIT-green)](#)
 
 Real-data autonomous trading agent for Solana pump launches. The agent **finds
 alpha before it moves — verifiably, onchain.** No mocked or seeded numbers: every
@@ -78,6 +78,8 @@ nothing is fabricated.
 │   └── tsconfig.json
 ├── docs/
 │   └── BUILD_PLAN.md          # Build plan + honest current-state record
+├── public/
+│   └── alpha-scout.svg        # Logo
 ├── src/                       # React frontend
 │   ├── components/
 │   │   ├── AppShell.tsx
@@ -95,6 +97,9 @@ nothing is fabricated.
 │   ├── index.css
 │   ├── main.tsx
 │   └── vite-env.d.ts
+├── .github/
+│   └── workflows/
+│       └── ci.yml             # CI: typecheck, lint, build
 ├── .eslintrc.cjs
 ├── .gitignore
 ├── convex.config.ts           # Convex component/options
@@ -150,4 +155,4 @@ record of current state.
 
 ## License
 
-Private — hackathon project.
+[MIT](LICENSE) — © 2026 opeblow (opeblow2021@gmail.com). Hackathon project.
