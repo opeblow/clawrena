@@ -24,12 +24,11 @@ export const ensureUser = mutation({
       )
       .first();
 
-    if (!existing && identity.email) {
-      existing = await ctx.db
-        .query("users")
-        .withIndex("email", (q) => q.eq("email", identity.email))
-        .first();
-    }
+    // NOTE: identity is the single source of truth for account ownership. The
+    // @convex-dev/auth Password provider already dedupes accounts by email at
+    // sign-up, so merging by raw email here would only invite cross-account
+    // links if the provider ever allowed duplicate emails. We deliberately do
+    // NOT fall back to an email lookup.
 
     const now = Date.now();
     let userId = existing?._id;
@@ -59,6 +58,7 @@ export const ensureUser = mutation({
         ownerId: userId!,
         cashSol: 0,
         investedSol: 0,
+        depositedSol: 0,
         updatedAt: now,
       });
     }

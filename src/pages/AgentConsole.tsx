@@ -1,6 +1,6 @@
 import { useState } from "react";
-import type { ReactNode } from "react";
-import { useQuery, useMutation } from "convex/react";
+import type { ReactNode, FormEvent } from "react";
+import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Card, CardBadge, EmptyState } from "../components/ui";
 import { formatSol, shorten } from "../lib/format";
@@ -11,16 +11,52 @@ export default function AgentConsole() {
   const deployAgent = useMutation(api.agents.deployAgent);
   const setAgentState = useMutation(api.agents.setAgentState);
   const updateRisk = useMutation(api.agents.updateAgentRisk);
+  const depositSol = useMutation(api.portfolio.depositSol);
+  const importBalance = useAction(api.wallet.importWalletBalance);
 
   const [wallet, setWalletInput] = useState("");
   const [name, setName] = useState("Alpha Scout");
   const [auto, setAuto] = useState(true);
   const [maxPos, setMaxPos] = useState(2);
   const [maxDD, setMaxDD] = useState(10);
+  const [depositAmt, setDepositAmt] = useState(1);
+  const [funding, setFunding] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
   const user = data?.user;
   const agent = data?.agent;
+  const portfolio = data?.portfolio;
+
+  const handleDeposit = async (event: FormEvent) => {
+    event.preventDefault();
+    setMsg(null);
+    setFunding(true);
+    try {
+      await depositSol({ amountSol: Number(depositAmt) });
+      setMsg(`Deposited ${formatSol(Number(depositAmt))}. Ready to trade.`);
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "Deposit failed.");
+    } finally {
+      setFunding(false);
+    }
+  };
+
+  const handleImport = async () => {
+    setMsg(null);
+    setFunding(true);
+    try {
+      const r = await importBalance();
+      setMsg(
+        r.importedSol > 0
+          ? `Imported ${formatSol(r.importedSol)} from your wallet (${formatSol(r.balanceSol)} balance).`
+          : `Wallet balance ${formatSol(r.balanceSol)} already reflected in your portfolio.`,
+      );
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "Import failed.");
+    } finally {
+      setFunding(false);
+    }
+  };
 
   const handleDeploy = async () => {
     setMsg(null);
@@ -143,6 +179,43 @@ export default function AgentConsole() {
             >
               {agent ? "Deployed" : "Deploy agent"}
             </button>
+          </Card>
+
+          <Card title="Fund Portfolio" badge={<CardBadge>{portfolio ? formatSol(portfolio.cashSol) : "0 SOL"}</CardBadge>} bodyClassName="p-5 flex flex-col gap-3">
+            <p className="text-[13px] text-ink-mid leading-relaxed">
+              Add paper SOL to trade with, or import the real balance of your
+              attached wallet. Nothing trades until the portfolio holds cash.
+            </p>
+            <form onSubmit={handleDeposit} className="flex gap-2">
+              <input
+                type="number"
+                min="0"
+                step="0.1"
+                value={depositAmt}
+                onChange={(e) => setDepositAmt(Number(e.target.value))}
+                className="flex-1 px-4 py-3 rounded-lg bg-surface border border-line text-[13px] font-mono outline-none focus:border-accent"
+              />
+              <button
+                type="submit"
+                disabled={funding}
+                className="px-4 py-3 rounded-lg bg-accent text-white text-[13px] font-semibold disabled:opacity-60"
+              >
+                Deposit
+              </button>
+            </form>
+            {user?.walletAddress ? (
+              <button
+                onClick={() => void handleImport()}
+                disabled={funding}
+                className="px-4 py-3 rounded-lg border border-line text-[13px] font-semibold hover:border-accent hover:text-accent disabled:opacity-60"
+              >
+                Import wallet balance
+              </button>
+            ) : (
+              <p className="text-[12px] text-ink-faint">
+                Attach a wallet above to import its real SOL balance.
+              </p>
+            )}
           </Card>
 
           {agent && (

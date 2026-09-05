@@ -2,17 +2,13 @@
 
 import { action } from "./_generated/server";
 import { v } from "convex/values";
-import { internal } from "./_generated/api";
 import {
   fetchHolderConcentration,
   fetchTokenMeta,
   fetchMarketSnapshot,
   isMarketConfigured,
 } from "./lib/market";
-
-// Break the type-level cycle (module -> internal -> module) that TS cannot
-// resolve during inference. The runtime object is unchanged.
-const I = internal as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+import { internal } from "./_generated/api";
 
 export type ShieldCheck = {
   id: string;
@@ -34,6 +30,10 @@ export type ShieldCheck = {
 export const scan = action({
   args: { tokenMint: v.string() },
   handler: async (ctx, { tokenMint }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
     const mint = tokenMint.trim();
     if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(mint)) {
       return { valid: false, error: "Not a valid Solana base58 mint." };
@@ -106,7 +106,7 @@ export const scan = action({
 
     const flagCount = checks.filter((c) => c.status === "flag").length;
 
-    await ctx.runMutation(I.signals.recordTelemetry, {
+    await ctx.runMutation(internal.signals.recordTelemetry, {
       eventType: "shield.scan",
       payload: {
         mint,

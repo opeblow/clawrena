@@ -51,6 +51,39 @@ export const createSignal = internalMutation({
 });
 
 /**
+ * Internal recorder: mark a `new-launch` signal as already acted on by the
+ * agent, so the harness never opens the same token twice.
+ */
+export const markSignalActed = internalMutation({
+  args: { signalId: v.id("signals") },
+  handler: async (ctx, { signalId }) => {
+    const signal = await ctx.db.get(signalId);
+    if (!signal) return null;
+    return ctx.db.patch(signalId, { actedOn: true, processedAt: Date.now() });
+  },
+});
+
+/**
+ * Telemetry retention: delete rows older than `cutoff`. Lives here (next to
+ * the telemetry recorder) so the cleanup action can call it cross-module.
+ */
+export const sweepTelemetryRows = internalMutation({
+  args: { cutoff: v.number() },
+  handler: async (ctx, { cutoff }) => {
+    const old = await ctx.db
+      .query("telemetry")
+      .withIndex("by_timestamp", (q) => q.lte("timestamp", cutoff))
+      .take(5000);
+    let deleted = 0;
+    for (const row of old) {
+      await ctx.db.delete(row._id);
+      deleted += 1;
+    }
+    return deleted;
+  },
+});
+
+/**
  * Webhook intake for real on-chain launch observations (Helius). Each mint is
  * deduped — a mint already recorded as `new-launch` is skipped, so replaying a
  * webhook never duplicates signals.

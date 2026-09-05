@@ -25,6 +25,8 @@ export const loadAgentContext = internalQuery({
         status: agent.status,
         autoTrading: agent.autoTrading,
         ownerId: agent.ownerId,
+        riskMaxPosition: agent.riskMaxPosition,
+        riskMaxDrawdownPct: agent.riskMaxDrawdownPct,
       },
       portfolio: portfolio
         ? {
@@ -49,5 +51,33 @@ export const listEligibleAgents = internalQuery({
       .take(200);
     return agents
       .map((a) => ({ id: a._id, status: a.status }));
+  },
+});
+
+/**
+ * Candidate tokens an agent may still act on: real `new-launch` signals not
+ * yet acted on, excluding mints the agent already holds open. Used by the
+ * harness discovery phase to open fresh positions only once per launch.
+ */
+export const listCandidateLaunches = internalQuery({
+  args: {
+    excludeMints: v.optional(v.array(v.string())),
+  },
+  handler: async (ctx, { excludeMints }) => {
+    const excluded = new Set(excludeMints ?? []);
+    const rows = await ctx.db
+      .query("signals")
+      .withIndex("by_type_processedAt", (q) => q.eq("type", "new-launch"))
+      .order("desc")
+      .take(50);
+    return rows
+      .filter((s) => s.actedOn !== true && !excluded.has(s.tokenMint))
+      .slice(0, 5)
+      .map((s) => ({
+        signalId: s._id,
+        mint: s.tokenMint,
+        symbol: s.tokenSymbol ?? null,
+        processedAt: s.processedAt,
+      }));
   },
 });

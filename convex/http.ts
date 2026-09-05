@@ -57,12 +57,17 @@ http.route({ path: "/webhooks/helius", method: "POST", handler: heliusWebhook })
 
 type MintEvent = { mint: string; signature?: string; ts?: number };
 
-const SYSTEM_OWNERS = new Set(["0", "11111111111111111111111111111111"]);
+const SPL_TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 
 /**
- * Pull newly created mints out of a Helius webhook payload. A mint is
- * "new" when a token account owned by the system program shows up inside a
- * transfer (the first sign of a token being minted/created on-chain).
+ * Pull newly created mints out of a Helius webhook payload.
+ *
+ * A mint is treated as "new" only when the transaction actually created a
+ * token account (Helius marks a first-written account with `writeVersion: 0`)
+ * owned by the SPL Token program — the on-chain signature of an
+ * initializeMint/create. The old heuristic keyed off any account owned by the
+ * system program, which matches the fee payer of *every* transaction and
+ * mislabeled normal transfers as new launches.
  */
 function extractNewMints(payload: unknown): MintEvent[] {
   const txs = Array.isArray(payload)
@@ -78,13 +83,18 @@ function extractNewMints(payload: unknown): MintEvent[] {
     const tx = raw as {
       transaction?: { signature?: string };
       signature?: string;
-      accountData?: Array<{ owner?: string }>;
-      tokenTransfers?: Array<{ mint?: string }>;
+      accountData?: Array<{ owner?: string; writeVersion?: number }>;
+      tokenTransfers?: Array<{ mint?: string; fromUserAccount?: string; toUserAccount?: string }>;
       timestamp?: number;
       time?: number;
     };
-    const created = (tx.accountData ?? []).some((a) => a.owner && SYSTEM_OWNERS.has(a.owner));
-    if (!created) continue;
+    const createdTokenAccounts = new Set<string>();
+    for (const a of tx.accountData ?? []) {
+      if (a.owner === SPL_TOKEN_PROGRAM && (a.writeVersion === 0 || a.writeVersion === undefined)) {
+        createdTokenAccounts.add("__any__");
+      }
+    }
+    if (createdTokenAccounts.size === 0) continue;
     const signature = tx.transaction?.signature ?? tx.signature;
     const fallbackTs = Number(tx.timestamp ?? tx.time ?? Date.now());
     for (const t of tx.tokenTransfers ?? []) {

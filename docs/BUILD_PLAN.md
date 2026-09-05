@@ -219,6 +219,15 @@ modules (a build artifact that `convex dev` regenerates identically on any
 unblocked machine). Unblock the binary, or push to Convex Cloud, to run the
 live app.
 
+**Funding path (2026-09-04):** to make the loop actually runnable before real
+swap creds exist, a paper funding bridge was added — `portfolio.depositSol`
+(manual add) and `wallet.importWalletBalance` (imports the attached wallet's
+real SOL balance via RPC) fill a portfolio's `cashSol`. `trades.openPosition` is
+an action that fetches the real Jupiter price server-side, and the harness opens
+positions against un-acted `new-launch` signals sized by `riskMaxPosition` and
+capped by available cash. This demonstrates the full signal→position loop end to
+end; real onchain swap execution still waits on ClawPump/Hermes creds.
+
 ## 9. NEXT ACTIONS (immediate order)
 
 1. Scaffold monorepo + Convex + Vite/Tailwind — **done**

@@ -2,13 +2,38 @@
 
 import { internalAction } from "./_generated/server";
 import type { ActionCtx } from "./_generated/server";
-import { v } from "convex/values";
+import type { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import { fetchPrices } from "./lib/market";
 
-// Break the type-level cycle (module -> internal -> module) that TS cannot
-// resolve during inference. The runtime object is unchanged.
-const I = internal as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+// The typed `internal` aggregate is used throughout (runQuery/runMutation) so
+// internal calls are type-checked — no `internal as any`.
+
+// Default risk exits the harness attaches to its own entries (configurable per
+// position on a manual trade). Honest, fixed, and shown in the signal.
+const DEFAULT_STOP_PCT = 0.2;
+const DEFAULT_TAKE_PROFIT_PCT = 0.5;
+const MAX_DISCOVERIES_PER_CYCLE = 3;
+
+type AgentState = {
+  id: Id<"agents">;
+  status: "idle" | "running" | "paused" | "halted";
+  autoTrading: boolean;
+  ownerId: Id<"users">;
+  riskMaxPosition: number;
+  riskMaxDrawdownPct: number;
+};
+
+type OpenPosition = {
+  _id: Id<"positions">;
+  tokenMint: string;
+  tokenSymbol?: string;
+  sizeSol: number;
+  entryPrice: number;
+  currentPrice: number;
+  stopLoss?: number;
+  takeProfit?: number;
+};
 
 /**
  * Agent harness core (Hermes-style loop). One cycle per eligible agent:
@@ -18,19 +43,23 @@ const I = internal as any; // eslint-disable-line @typescript-eslint/no-explicit
  * 3. Recomputes each position's real unrealized PnL from market data.
  * 4. Enforces risk exits — stop-loss / take-profit — closing positions and
  *    recording matched sell trades.
- * 5. Enforces the portfolio drawdown cap; halts the agent when breached.
- * 6. Logs the whole cycle to `agent_runs` for auditability.
+ * 5. Discovery phase: opens new positions on real, not-yet-acted `new-launch`
+ *    signals, sized by `riskMaxPosition` and capped by available cash.
+ * 6. Enforces the portfolio's user-configured drawdown cap; halts the agent
+ *    when breached.
+ * 7. Logs the whole cycle to `agent_runs` for auditability.
  *
  * Everything is computed from real system state and live market data. With no
- * positions or agents, this returns zeros and writes no fake activity.
+ * cash, no eligible signals or no running agents, this returns zeros and
+ * writes no fake activity.
  */
 export const run = internalAction({
-  args: { agentId: v.optional(v.id("agents")) },
-  handler: async (ctx, { agentId }) => {
-    const targets = agentId
-      ? [{ id: agentId }]
-      : await ctx.runQuery(I.queries.internal.listEligibleAgents, {});
-
+  args: {},
+  handler: async (ctx) => {
+    const targets: Array<{ id: Id<"agents">; status: string }> = await ctx.runQuery(
+      internal.queries.internal.listEligibleAgents,
+      {},
+    );
     const summaries = [];
     for (const t of targets) {
       summaries.push(await runCycle(ctx, t.id));
@@ -39,23 +68,19 @@ export const run = internalAction({
   },
 });
 
-async function runCycle(ctx: ActionCtx, agentId: string) {
+async function runCycle(ctx: ActionCtx, agentId: Id<"agents">) {
   const startedAt = Date.now();
-  const learned = await ctx.runQuery(I.queries.internal.loadAgentContext, {
+  const learned = await ctx.runQuery(internal.queries.internal.loadAgentContext, {
     agentId,
   });
   if (!learned) {
     return { agentId, outcome: "error", reason: "no agent" };
   }
 
-  const open: any[] = learned.openPositions ?? []; // eslint-disable-line @typescript-eslint/no-explicit-any
-  if (
-    learned.agent.status !== "running" ||
-    !learned.agent.autoTrading ||
-    !learned.portfolio ||
-    open.length === 0
-  ) {
-    await ctx.runMutation(I.agents.logAgentRun, {
+  const agent = learned.agent as AgentState;
+  const open = (learned.openPositions ?? []) as OpenPosition[];
+  if (agent.status !== "running" || !agent.autoTrading || !learned.portfolio) {
+    await ctx.runMutation(internal.agents.logAgentRun, {
       agentId,
       startedAt,
       endedAt: Date.now(),
@@ -66,8 +91,8 @@ async function runCycle(ctx: ActionCtx, agentId: string) {
     return { agentId, outcome: "ok", positionsProcessed: 0, tradesExecuted: 0 };
   }
 
-  const mints: string[] = [...new Set(open.map((p) => p.tokenMint))];
-  const prices = await fetchPrices(mints);
+  const openMints: string[] = [...new Set(open.map((p) => p.tokenMint))];
+  const prices = await fetchPrices(openMints);
   let tradesExecuted = 0;
   let processed = 0;
 
@@ -76,12 +101,12 @@ async function runCycle(ctx: ActionCtx, agentId: string) {
     if (price === undefined) continue;
     processed += 1;
 
-    await ctx.runMutation(I.trades.updatePositionPrice, {
+    await ctx.runMutation(internal.trades.updatePositionPrice, {
       positionId: position._id,
       price,
       at: startedAt,
     });
-    await ctx.runMutation(I.signals.recordTelemetry, {
+    await ctx.runMutation(internal.signals.recordTelemetry, {
       eventType: "price.tick",
       payload: { mint: position.tokenMint, price, source: "jupiter", at: startedAt },
     });
@@ -89,12 +114,12 @@ async function runCycle(ctx: ActionCtx, agentId: string) {
     const stop = position.stopLoss;
     const target = position.takeProfit;
     if (stop !== undefined && price <= stop) {
-      await ctx.runMutation(I.trades.internalClosePosition, {
+      await ctx.runMutation(internal.trades.internalClosePosition, {
         positionId: position._id,
         reason: "stop",
       });
       tradesExecuted += 1;
-      await ctx.runMutation(I.signals.createSignal, {
+      await ctx.runMutation(internal.signals.createSignal, {
         tokenMint: position.tokenMint,
         ...(position.tokenSymbol && { tokenSymbol: position.tokenSymbol }),
         type: "warn",
@@ -105,12 +130,12 @@ async function runCycle(ctx: ActionCtx, agentId: string) {
         payload: { price, stop, direction: "sell" },
       });
     } else if (target !== undefined && price >= target) {
-      await ctx.runMutation(I.trades.internalClosePosition, {
+      await ctx.runMutation(internal.trades.internalClosePosition, {
         positionId: position._id,
         reason: "target",
       });
       tradesExecuted += 1;
-      await ctx.runMutation(I.signals.createSignal, {
+      await ctx.runMutation(internal.signals.createSignal, {
         tokenMint: position.tokenMint,
         ...(position.tokenSymbol && { tokenSymbol: position.tokenSymbol }),
         type: "sell",
@@ -123,39 +148,45 @@ async function runCycle(ctx: ActionCtx, agentId: string) {
     }
   }
 
-  // Drawdown enforcement after exits: openValue vs the invested cost.
-  const fresh = await ctx.runQuery(I.queries.internal.loadAgentContext, {
+  // Discovery: open fresh positions on real, un-acted launch signals.
+  const discovered = await discoverEntries(ctx, agent, openMints);
+  tradesExecuted += discovered.tradesExecuted;
+  processed += discovered.candidatesExamined;
+
+  // Drawdown enforcement after exits and entries: open value vs invested cost.
+  const fresh = await ctx.runQuery(internal.queries.internal.loadAgentContext, {
     agentId,
   });
   let outcome: "ok" | "halted" = "ok";
 
-  if (fresh?.portfolio && fresh.openPositions.length > 0) {
+  const freshAgent = fresh?.agent as AgentState | undefined;
+  if (fresh?.portfolio && fresh.openPositions.length > 0 && freshAgent) {
     const cost = fresh.portfolio.investedSol;
     const value = fresh.openPositions.reduce(
-      (sum: number, p: any) => sum + (p.currentPrice / p.entryPrice) * p.sizeSol, // eslint-disable-line @typescript-eslint/no-explicit-any
+      (sum: number, p: OpenPosition) => sum + (p.currentPrice / p.entryPrice) * p.sizeSol,
       0,
     );
-    if (cost > 0 && value < cost * 0.5) {
-      // Hard circuit: account lost too much to keep trading.
-      await ctx.runMutation(I.agents.internalSetStatus, {
+    const maxDrawdownPct = freshAgent.riskMaxDrawdownPct;
+    const threshold = cost * (1 - Math.min(100, Math.max(0, maxDrawdownPct)) / 100);
+    if (cost > 0 && value < threshold) {
+      await ctx.runMutation(internal.agents.internalSetStatus, {
         agentId,
         status: "halted",
       });
-      await ctx.runMutation(I.signals.createSignal, {
+      await ctx.runMutation(internal.signals.createSignal, {
         tokenMint: fresh.openPositions[0].tokenMint,
         type: "warn",
         confidence: 95,
         score: -4,
         title: "Agent halted — drawdown guard",
-        detail:
-          "Harness halted the agent because open value fell below the safety threshold.",
-        payload: { cost, value },
+        detail: `Harness halted the agent: open value fell ${maxDrawdownPct}% below cost (your configured drawdown cap).`,
+        payload: { cost, value, maxDrawdownPct },
       });
       outcome = "halted";
     }
   }
 
-  await ctx.runMutation(I.agents.logAgentRun, {
+  await ctx.runMutation(internal.agents.logAgentRun, {
     agentId,
     startedAt,
     endedAt: Date.now(),
@@ -165,4 +196,91 @@ async function runCycle(ctx: ActionCtx, agentId: string) {
   });
 
   return { agentId, outcome, positionsProcessed: processed, tradesExecuted };
+}
+
+/**
+ * Discovery phase: for an eligible running agent, act on up to
+ * MAX_DISCOVERIES_PER_CYCLE recent `new-launch` signals the agent has not yet
+ * acted on. Each token must have a real Jupiter price (never guessed), the
+ * size is the agent's configured risk max capped by remaining cash, and the
+ * signal is marked acted so the harness never opens the same launch twice.
+ */
+async function discoverEntries(
+  ctx: ActionCtx,
+  agent: AgentState,
+  alreadyHeldMints: string[],
+): Promise<{ tradesExecuted: number; candidatesExamined: number }> {
+  const candidates: Array<{
+    signalId: Id<"signals">;
+    mint: string;
+    symbol: string | null;
+    processedAt: number;
+  }> = await ctx.runQuery(internal.queries.internal.listCandidateLaunches, {
+    excludeMints: alreadyHeldMints,
+  });
+
+  if (candidates.length === 0) {
+    return { tradesExecuted: 0, candidatesExamined: 0 };
+  }
+
+  const mints = candidates.map((c) => c.mint);
+  const prices = await fetchPrices(mints);
+  let remainingCash = Math.max(0, await currentCash(ctx, agent));
+
+  let opened = 0;
+  let examined = 0;
+  for (const c of candidates) {
+    const price = prices[c.mint];
+    if (price === undefined || price <= 0) continue;
+    examined += 1;
+    if (opened >= MAX_DISCOVERIES_PER_CYCLE) break;
+    if (remainingCash <= 0) break;
+
+    const sizeSol = Math.min(agent.riskMaxPosition, remainingCash);
+    const entry = price;
+    try {
+      await ctx.runMutation(internal.trades.internalOpenPosition, {
+        agentId: agent.id,
+        tokenMint: c.mint,
+        ...(c.symbol && { tokenSymbol: c.symbol }),
+        sizeSol,
+        price: entry,
+        stopLoss: entry * (1 - DEFAULT_STOP_PCT),
+        takeProfit: entry * (1 + DEFAULT_TAKE_PROFIT_PCT),
+      });
+      await ctx.runMutation(internal.signals.markSignalActed, { signalId: c.signalId });
+      await ctx.runMutation(internal.signals.createSignal, {
+        tokenMint: c.mint,
+        ...(c.symbol && { tokenSymbol: c.symbol }),
+        type: "buy",
+        confidence: 40,
+        score: 1,
+        title: "Agent opened position",
+        detail: `Entered ${formatSol(sizeSol)} on a new launch at ${entry}. Stop ${entry * (1 - DEFAULT_STOP_PCT)}, target ${entry * (1 + DEFAULT_TAKE_PROFIT_PCT)}.`,
+        payload: { price: entry, sizeSol, stopLoss: entry * (1 - DEFAULT_STOP_PCT), takeProfit: entry * (1 + DEFAULT_TAKE_PROFIT_PCT) },
+      });
+      await ctx.runMutation(internal.signals.recordTelemetry, {
+        eventType: "agent.opened",
+        payload: { mint: c.mint, price: entry, sizeSol, signalId: c.signalId, at: Date.now() },
+      });
+      remainingCash -= sizeSol;
+      opened += 1;
+    } catch {
+      // Insufficient cash / risk-limit rejection: skip this candidate and
+      // keep the loop going on the next one.
+    }
+  }
+  return { tradesExecuted: opened, candidatesExamined: examined };
+}
+
+/** Fresh portfolio cash (post-exit) for the discovery sizing decision. */
+async function currentCash(ctx: ActionCtx, agent: AgentState): Promise<number> {
+  const fresh = await ctx.runQuery(internal.queries.internal.loadAgentContext, {
+    agentId: agent.id,
+  });
+  return fresh?.portfolio?.cashSol ?? 0;
+}
+
+function formatSol(n: number): string {
+  return n.toLocaleString(undefined, { maximumFractionDigits: 4 });
 }

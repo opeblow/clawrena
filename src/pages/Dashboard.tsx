@@ -97,7 +97,10 @@ export default function Dashboard() {
                 <b className="text-ink">{agent.status}</b> with{" "}
                 <b className="text-ink">auto-trading {agent.autoTrading ? "on" : "off"}</b>.
                 Risk caps — max position {formatSol(agent.riskMaxPosition)}, max
-                drawdown {agent.riskMaxDrawdownPct}%. No trades executed yet.
+                drawdown {agent.riskMaxDrawdownPct}%.{" "}
+                {agent.status === "running"
+                  ? "Position risk checks run every 15 minutes."
+                  : "Start the agent to begin scanning and trading."}
               </div>
             ) : (
               <EmptyState

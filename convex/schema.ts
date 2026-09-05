@@ -33,8 +33,17 @@ export default defineSchema({
     agentId: v.optional(v.id("agents")),
     cashSol: v.number(),
     investedSol: v.number(),
+    depositedSol: v.optional(v.number()),
     updatedAt: v.number(),
   }).index("by_ownerId", ["ownerId"]),
+
+  deposits: defineTable({
+    portfolioId: v.id("portfolios"),
+    amountSol: v.number(),
+    source: v.union(v.literal("manual"), v.literal("wallet")),
+    txSignature: v.optional(v.string()),
+    createdAt: v.number(),
+  }).index("by_portfolioId_createdAt", ["portfolioId", "createdAt"]),
 
   agents: defineTable({
     ownerId: v.id("users"),
@@ -58,7 +67,7 @@ export default defineSchema({
     sizeSol: v.number(),
     entryPrice: v.number(),
     currentPrice: v.number(),
-    pnlUsd: v.number(),
+    pnlSol: v.number(),
     pnlPct: v.number(),
     stopLoss: v.optional(v.number()),
     takeProfit: v.optional(v.number()),
@@ -102,6 +111,7 @@ export default defineSchema({
     title: v.string(),
     detail: v.string(),
     payload: v.any(),
+    actedOn: v.optional(v.boolean()),
     processedAt: v.number(),
   })
     .index("by_processedAt", ["processedAt"])

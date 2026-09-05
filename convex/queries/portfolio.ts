@@ -46,8 +46,12 @@ export const dashboard = query({
       .withIndex("by_ownerId", (q) => q.eq("ownerId", user._id))
       .first();
 
-    // Aggregate real numbers only.
-    const positionValue = positions.reduce((sum, p) => sum + p.sizeSol, 0);
+    // Aggregate real numbers only. Position value is mark-to-market — current
+    // price ratio applied to the SOL size — not entry cost basis.
+    const positionValue = positions.reduce(
+      (sum, p) => sum + (p.currentPrice / p.entryPrice) * p.sizeSol,
+      0,
+    );
     const portfolioValue = cashSol(portfolio) + positionValue;
     const realizedPnl = portfolio ? await sumTrades(ctx, portfolio._id) : 0;
 
@@ -69,6 +73,7 @@ export const dashboard = query({
             id: portfolio._id,
             cashSol: portfolio.cashSol,
             investedSol: portfolio.investedSol,
+            depositedSol: portfolio.depositedSol ?? 0,
             positionValue,
             portfolioValue,
             realizedPnl,

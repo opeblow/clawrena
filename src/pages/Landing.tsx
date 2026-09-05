@@ -1,7 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { useConvexAuth, useMutation } from "convex/react";
+import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { api } from "../../convex/_generated/api";
 
@@ -9,6 +9,7 @@ export default function Landing() {
   const { isAuthenticated } = useConvexAuth();
   const { signIn } = useAuthActions();
   const ensureUser = useMutation(api.users.ensureUser);
+  const stats = useQuery(api.queries.public.publicStats);
   const navigate = useNavigate();
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<"signIn" | "signUp">("signUp");
@@ -100,15 +101,21 @@ export default function Landing() {
           </div>
           <div className="flex gap-11">
             <div>
-              <div className="font-mono text-[26px] font-extrabold">0</div>
+              <div className="font-mono text-[26px] font-extrabold">
+                {stats === undefined ? "…" : stats.tradesExecuted}
+              </div>
               <div className="text-[13px] text-ink-faint mt-1">Trades executed</div>
             </div>
             <div>
-              <div className="font-mono text-[26px] font-extrabold">0</div>
+              <div className="font-mono text-[26px] font-extrabold">
+                {stats === undefined ? "…" : stats.agentsDeployed}
+              </div>
               <div className="text-[13px] text-ink-faint mt-1">Agents deployed</div>
             </div>
             <div>
-              <div className="font-mono text-[26px] font-extrabold">0 SOL</div>
+              <div className="font-mono text-[26px] font-extrabold">
+                {stats === undefined ? "…" : `${String(stats.volumeSol.toLocaleString(undefined, { maximumFractionDigits: 2 }))} SOL`}
+              </div>
               <div className="text-[13px] text-ink-faint mt-1">Volume traded</div>
             </div>
           </div>
