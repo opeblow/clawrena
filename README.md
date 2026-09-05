@@ -1,6 +1,6 @@
 # Alpha Scout
 
-![Alpha Scout landing page](public/landing.png)
+
 
 [![build](https://img.shields.io/badge/build-passing-brightgreen)](#) [![typescript](https://img.shields.io/badge/TypeScript-5-blue)](#) [![convex](https://img.shields.io/badge/Convex-1.45-f56513)](#)
 
