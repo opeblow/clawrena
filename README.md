@@ -52,6 +52,62 @@ nothing is fabricated.
 | Chain | Solana — Jupiter (pricing), public RPC + Helius (wallet/launch data) |
 | Auth | Convex Auth (sign-in) |
 
+## Project structure
+
+```
+.
+├── convex/                    # Convex backend (schema, queries, mutations, actions)
+│   ├── _generated/            # Convex-generated client + schema types (hand-synced locally)
+│   ├── lib/                   # Shared serverside helpers (HTTP, market data)
+│   ├── queries/               # Read-path queries (public, portfolio, signals, signal, internal)
+│   ├── agents.ts              # Agent profile model
+│   ├── auth.ts                # Convex Auth wiring
+│   ├── auth.config.ts         # Auth app config
+│   ├── cleanup.ts             # Retention / sweep logic
+│   ├── crons.ts               # Recurring scheduled jobs
+│   ├── http.ts                # HTTP actions (webhooks)
+│   ├── portfolio.ts           # Portfolio model (cash, holdings, drawdown)
+│   ├── runAgent.ts            # Autonomous agent harness (the trading loop)
+│   ├── scanner.ts             # Launch-discovery scanner (pump.fun → signals)
+│   ├── schema.ts              # Database schema
+│   ├── shieldScan.ts          # Manipulation shield (wash/bundle/honeypot checks)
+│   ├── signals.ts             # Signal model + ingestion
+│   ├── trades.ts              # Trade model + matched fills
+│   ├── users.ts               # User model
+│   ├── wallet.ts              # Paper/import wallet funding bridge
+│   └── tsconfig.json
+├── docs/
+│   └── BUILD_PLAN.md          # Build plan + honest current-state record
+├── src/                       # React frontend
+│   ├── components/
+│   │   ├── AppShell.tsx
+│   │   └── ui.tsx
+│   ├── lib/
+│   │   └── format.ts
+│   ├── pages/
+│   │   ├── AgentConsole.tsx
+│   │   ├── Dashboard.tsx
+│   │   ├── Landing.tsx
+│   │   ├── Signals.tsx
+│   │   └── Token.tsx
+│   ├── App.tsx
+│   ├── convexClient.ts
+│   ├── index.css
+│   ├── main.tsx
+│   └── vite-env.d.ts
+├── .eslintrc.cjs
+├── .gitignore
+├── convex.config.ts           # Convex component/options
+├── index.html
+├── package.json
+├── package-lock.json
+├── postcss.config.js
+├── tailwind.config.js
+├── tsconfig.json
+├── vite.config.ts
+└── README.md
+```
+
 ## Getting Started
 
 ```
