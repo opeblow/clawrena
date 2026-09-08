@@ -1,6 +1,20 @@
-# Alpha Scout&nbsp;<img src="public/alpha-scout.svg" width="42" height="42" alt="Alpha Scout logo" align="left" style="margin-right:12px; transform:translateY(4px);">
+<p align="center">
+  <img src="public/alpha-scout.svg" width="80" height="80" alt="Alpha Scout logo">
+</p>
 
-[![build](https://img.shields.io/badge/build-passing-brightgreen)](#) [![typescript](https://img.shields.io/badge/TypeScript-5-blue)](#) [![convex](https://img.shields.io/badge/Convex-1.45-f56513)](#) [![solana](https://img.shields.io/badge/Solana-000000)](#) [![license](https://img.shields.io/badge/license-MIT-green)](#)
+<h1 align="center">Alpha Scout</h1>
+
+<p align="center">
+  <em>Real-data autonomous trading agent for Solana pump launches.</em>
+</p>
+
+<p align="center">
+  <a href="#"><img src="https://img.shields.io/badge/build-passing-brightgreen" alt="build"></a>
+  <a href="#"><img src="https://img.shields.io/badge/TypeScript-5-blue" alt="typescript"></a>
+  <a href="#"><img src="https://img.shields.io/badge/Convex-1.45-f56513" alt="convex"></a>
+  <a href="#"><img src="https://img.shields.io/badge/Solana-000000" alt="solana"></a>
+  <a href="#"><img src="https://img.shields.io/badge/license-MIT-green" alt="license"></a>
+</p>
 
 Real-data autonomous trading agent for Solana pump launches. The agent **finds
 alpha before it moves — verifiably, onchain.** No mocked or seeded numbers: every
@@ -155,4 +169,4 @@ record of current state.
 
 ## License
 
-[MIT](LICENSE) — © 2026 opeblow (opeblow2021@gmail.com). Hackathon project.
+[MIT](LICENSE) — © 2026 Mobolaji Opeyemi Bolatito (opeblow2021@gmail.com). Hackathon project.
