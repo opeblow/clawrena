@@ -16,6 +16,8 @@
   <a href="#"><img src="https://img.shields.io/badge/license-MIT-green" alt="license"></a>
 </p>
 
+https://github.com/user-attachments/assets/7f6f2cde-fd2a-414f-b274-39e756f3aef5
+
 Real-data autonomous trading agent for Solana pump launches. The agent **finds
 alpha before it moves — verifiably, onchain.** No mocked or seeded numbers: every
 signal, position and trade derives from live system state.
@@ -154,10 +156,6 @@ npm run lint        # eslint src convex
 
 - **Live URL:** _will fill in after deploy_
 - **Demo video:** _will fill in after deploy_
-
-### Demo clips
-
-https://github.com/user-attachments/assets/7f6f2cde-fd2a-414f-b274-39e756f3aef5
 
 ## Production / roadmap
 
