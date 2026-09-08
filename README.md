@@ -155,6 +155,14 @@ npm run lint        # eslint src convex
 - **Live URL:** _will fill in after deploy_
 - **Demo video:** _will fill in after deploy_
 
+### Demo clips
+
+https://github.com/user-attachments/assets/7f6f2cde-fd2a-414f-b274-39e756f3aef5
+
+https://github.com/user-attachments/assets/883ee4d5-6fd4-40e4-9c6a-e62faa109f00
+
+https://github.com/user-attachments/assets/307444cf-4a44-402a-b2e5-c05ec99e6df9
+
 ## Production / roadmap
 
 - [ ] Deploy to Convex Cloud + Vercel and drop in the live URL above.
